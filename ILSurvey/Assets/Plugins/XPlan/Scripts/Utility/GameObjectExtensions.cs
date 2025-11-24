@@ -1,0 +1,214 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace XPlan.Utility
+{
+    public static class GameObjectExtensions
+    {
+        public static List<GameObject> GetAllChildren(this GameObject gameObject, Func<GameObject, bool> filter = null, bool bRecursive = true)
+        {
+            List<GameObject> allChildren = new List<GameObject>();
+
+            // 遞迴函數，遍歷子物件
+            void GetChildrenRecursive(Transform parent)
+            {
+                foreach (Transform child in parent)
+                {
+                    // 只有符合過濾條件的子物件才會被加入列表
+                    if (filter == null || filter(child.gameObject))
+                    {
+                        allChildren.Add(child.gameObject);
+                    }
+
+                    // 遞迴調用，檢查這個子物件的子物件
+                    if (bRecursive)
+                    {
+                        GetChildrenRecursive(child);
+                    }
+                }
+            }
+
+            // 從傳入的 GameObject 開始遞迴
+            GetChildrenRecursive(gameObject.transform);
+
+            return allChildren;
+        }
+
+        public static void ClearAllChildren(this GameObject gameObject, float delayTime = 0f)
+        {
+            // 取得父物件的Transform
+            Transform parentTransform = gameObject.transform;
+
+            // 逐個刪除子物件
+            for (int i = parentTransform.childCount - 1; i >= 0; i--)
+            {
+                Transform childTransform = parentTransform.GetChild(i);
+
+                if (delayTime == 0f)
+                {
+                    GameObject.DestroyImmediate(childTransform.gameObject);
+                }
+                else
+                {
+                    GameObject.Destroy(childTransform.gameObject, delayTime);
+                }
+            }
+        }
+
+        //public static void AddChild(this GameObject gameObject, GameObject childGO)
+        //{
+        //    if (childGO == null)
+        //    {
+        //        return;
+        //    }
+
+        //    childGO.transform.SetParent(gameObject.transform);
+        //}
+
+        public static void MoveToMainRoot(this GameObject gameObject)
+        {
+            if (gameObject == null)
+            {
+                return;
+            }
+
+            // 不在根目錄的GameObject 不能使用 MoveGameObjectToScene
+            gameObject.transform.parent = null;
+
+            Scene mainScene = SceneManager.GetSceneAt(0);
+
+            if (mainScene.IsValid())
+            {
+                SceneManager.MoveGameObjectToScene(gameObject, mainScene);
+            }
+        }
+
+        public static void AddChild(this GameObject gameObject, GameObject childGO
+            , Vector3 locPos        = default(Vector3)
+            , Vector3 eulerAngles   = default(Vector3)
+            , float ratio           = 1.0f)
+        {
+            if (childGO == null)
+            {
+                return;
+            }
+
+            childGO.transform.SetParent(gameObject.transform);
+            childGO.transform.localPosition     = locPos;
+            childGO.transform.localEulerAngles  = eulerAngles;
+            childGO.transform.localScale        = new Vector3(ratio, ratio, ratio);
+        }
+
+        public static void SetLayer(this GameObject gameObject, string layer, bool bContainChild = true)
+        {
+            gameObject.layer = LayerMask.NameToLayer(layer);
+
+            if (bContainChild)
+            {
+                int count = gameObject.transform.childCount;
+
+                for (int i = 0; i < count; ++i)
+                {
+                    SetLayer(gameObject.transform.GetChild(i).gameObject, layer, bContainChild);
+                }
+            }
+        }
+
+        public static T AddOrFindComponent<T>(this GameObject gameObject) where T : Component
+        {
+            T comp = null;
+
+            if(!gameObject.TryGetComponent<T>(out comp))
+            {
+                comp = gameObject.AddComponent<T>();
+            }
+            
+            return comp;
+        }
+
+        /**********************************************
+         * 單一版本：GetComponent<TInterface>()
+         **********************************************/
+        public static TInterface GetInterface<TInterface>(this GameObject go)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponents<MonoBehaviour>()
+                     .OfType<TInterface>()
+                     .FirstOrDefault();
+        }
+
+        /**********************************************
+         * 多個版本：GetComponents<TInterface>()
+         **********************************************/
+        public static List<TInterface> GetInterfaces<TInterface>(this GameObject go)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponents<MonoBehaviour>()
+                     .OfType<TInterface>()
+                     .ToList();
+        }
+
+        /**********************************************
+         * 子物件版本：GetComponentInChildren<TInterface>()
+         **********************************************/
+        public static TInterface GetInterfaceInChildren<TInterface>(this GameObject go, bool includeInactive = true)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponentsInChildren<MonoBehaviour>(includeInactive)
+                     .OfType<TInterface>()
+                     .FirstOrDefault();
+        }
+
+        /**********************************************
+         * 子物件多個版本：GetComponentsInChildren<TInterface>()
+         **********************************************/
+        public static List<TInterface> GetInterfacesInChildren<TInterface>(this GameObject go, bool includeInactive = true)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponentsInChildren<MonoBehaviour>(includeInactive)
+                     .OfType<TInterface>()
+                     .ToList();
+        }
+
+        /**********************************************
+         * 父物件版本：GetComponentInParent<TInterface>()
+         **********************************************/
+        public static TInterface GetInterfaceInParent<TInterface>(this GameObject go, bool includeInactive = true)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponentsInParent<MonoBehaviour>(includeInactive)
+                     .OfType<TInterface>()
+                     .FirstOrDefault();
+        }
+
+        /**********************************************
+         * 父物件多個版本：GetComponentsInParent<TInterface>()
+         **********************************************/
+        public static List<TInterface> GetInterfacesInParent<TInterface>(this GameObject go, bool includeInactive = true)
+        {
+            EnsureIsInterface<TInterface>();
+
+            return go.GetComponentsInParent<MonoBehaviour>(includeInactive)
+                     .OfType<TInterface>()
+                     .ToList();
+        }
+
+        /**********************************************
+         * 私有檢查：確保 T 是 interface
+         **********************************************/
+        private static void EnsureIsInterface<TInterface>()
+        {
+            if (!typeof(TInterface).IsInterface)
+                throw new InvalidOperationException($"{typeof(TInterface).Name} 必須是 interface。");
+        }
+    }
+}
+
