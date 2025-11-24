@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
 
+using XPlan;
+
 namespace WeaveTarget
 {
     public class CalculatorWithLog : MonoBehaviour

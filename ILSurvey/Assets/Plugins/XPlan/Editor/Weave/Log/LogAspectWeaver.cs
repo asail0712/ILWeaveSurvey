@@ -11,11 +11,11 @@ using static XPlan.Editor.Weaver.CecilWeaver;
 * LogAspect 的實作：原本 Patch_LogAspect 搬進來
 *************************************************/
 
-namespace XPlan.Editor.Weaver
+namespace XPlan.Editor.Weaver.Log
 {
     internal sealed class LogAspectWeaver : IMethodAspectWeaver
     {
-        public string AttributeFullName => "LogAspectAttribute";
+        public string AttributeFullName => "XPlan.LogAspectAttribute";
 
         public void Apply(ModuleDefinition module, MethodDefinition targetMethod, CustomAttribute attr)
         {
