@@ -28,6 +28,7 @@ namespace XPlan.Editors.Weaver
         private static readonly IMethodAspectWeaver[] _aspects =
         {
             new LogAspectWeaver(),
+            new NotifyHandlerWeaver(),
             // 之後你可以繼續加新的切面
             // new AnotherAspectWeaver(),
         };
@@ -82,8 +83,57 @@ namespace XPlan.Editors.Weaver
             string temp     = assemblyPath + ".weave.tmp";
             string backup   = assemblyPath + ".bak";
 
-            var rp          = new ReaderParameters { ReadSymbols = hasPdb };
-            var wp          = new WriterParameters { WriteSymbols = hasPdb };
+            /****************************************
+             * ★ 重點：設定 AssemblyResolver
+             ****************************************/
+            var resolver    = new DefaultAssemblyResolver();
+
+            // 目標 DLL 所在資料夾（通常就是 Library/ScriptAssemblies）
+            var asmDir = Path.GetDirectoryName(assemblyPath);
+            if (!string.IsNullOrEmpty(asmDir) && Directory.Exists(asmDir))
+            {
+                resolver.AddSearchDirectory(asmDir);
+            }
+
+            // 專案根目錄：Assets/..
+            var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+            // Library/ScriptAssemblies 底下放著：
+            // - Assembly-CSharp.dll
+            // - Assembly-CSharp-firstpass.dll
+            // - 各種 asmdef 對應的 dll
+            var scriptAssembliesDir = Path.Combine(projectRoot, "Library", "ScriptAssemblies");
+            if (Directory.Exists(scriptAssembliesDir))
+            {
+                resolver.AddSearchDirectory(scriptAssembliesDir);
+            }
+
+            // Unity 安裝路徑：EditorApplication.applicationPath → .../Editor/Unity.exe
+            var editorDir   = Path.GetDirectoryName(EditorApplication.applicationPath);
+            var dataDir     = Path.Combine(editorDir, "Data");
+
+            // 1) NetStandard BCL（shim）
+            var netStandardDir = Path.Combine(dataDir, "NetStandard", "compat");
+            if (Directory.Exists(netStandardDir))
+            {
+                resolver.AddSearchDirectory(netStandardDir);
+            }
+
+            // 2) MonoBleedingEdge BCL（System / mscorlib / netstandard 等）
+            // 版本號可能不一樣，這裡用 4.7.1-api 是 2021LTS 常見配置
+            var monoApiDir = Path.Combine(dataDir, "MonoBleedingEdge", "lib", "mono", "4.7.1-api");
+            if (Directory.Exists(monoApiDir))
+            {
+                resolver.AddSearchDirectory(monoApiDir);
+            }
+
+            var rp = new ReaderParameters
+            {
+                ReadSymbols         = hasPdb,
+                AssemblyResolver    = resolver,
+            };
+
+            var wp = new WriterParameters { WriteSymbols = hasPdb };
 
             using (var module = ModuleDefinition.ReadModule(assemblyPath, rp))
             {
