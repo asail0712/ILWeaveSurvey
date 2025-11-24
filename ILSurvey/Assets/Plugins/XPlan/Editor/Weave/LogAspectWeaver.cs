@@ -11,7 +11,7 @@ using static XPlan.Editor.Weaver.CecilWeaver;
 * LogAspect 的實作：原本 Patch_LogAspect 搬進來
 *************************************************/
 
-namespace XPlan.Editor.Weaver.Log
+namespace XPlan.Editor.Weaver
 {
     internal sealed class LogAspectWeaver : IMethodAspectWeaver
     {

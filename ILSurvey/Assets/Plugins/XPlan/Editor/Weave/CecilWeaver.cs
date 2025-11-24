@@ -10,8 +10,6 @@ using UnityEngine;
 
 using Mono.Cecil;
 
-using XPlan.Editor.Weaver.Log;
-
 namespace XPlan.Editor.Weaver
 {
     [InitializeOnLoad]
