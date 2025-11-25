@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using XPlan.UI.Fade;
@@ -470,6 +471,11 @@ namespace XPlan.UI
             else if (uiObj is Text textUi) // 純顯示
             {
                 Action<object> setter = v => { if (textUi != null) textUi.text = v?.ToString() ?? string.Empty; };
+                return SubscribeObject(opInstance, valueType, setter);
+            }
+            else if (uiObj is TextMeshProUGUI tmpUi) // 純顯示
+            {
+                Action<object> setter = v => { if (tmpUi != null) tmpUi.text = v?.ToString() ?? string.Empty; };
                 return SubscribeObject(opInstance, valueType, setter);
             }
             else if (uiObj is Toggle toggle && valueType == typeof(bool))

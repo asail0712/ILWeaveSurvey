@@ -82,20 +82,21 @@ namespace XPlan.Editors.Weaver
         }
 
         /// <summary>
-        /// 從指定 type 一路往上找，判斷該type是否為MonoBehaviour的子類
+        /// 從指定 type 一路往上找，判斷該type是否為targetFullName的子類
         /// 找不到就回傳 null。
         /// </summary>
-        public static bool IsMonoBehaviourSubclass(TypeDefinition type)
+        public static bool IsSubclassOf(TypeDefinition type, string targetFullName, int maxDepth = 16)
         {
             if (type == null) return false;
+            if (string.IsNullOrEmpty(targetFullName)) return false;
 
             TypeDefinition cur = type;
 
             // 防止意外循環，設個上限
-            for (int i = 0; i < 16 && cur != null; i++)
+            for (int i = 0; i < maxDepth && cur != null; i++)
             {
-                // 自己就是 MonoBehaviour
-                if (cur.FullName == "UnityEngine.MonoBehaviour")
+                // 自己就是指定型別
+                if (cur.FullName == targetFullName)
                     return true;
 
                 var baseRef = cur.BaseType;
@@ -103,7 +104,7 @@ namespace XPlan.Editors.Weaver
                     break;
 
                 // 先用 FullName 判一次，不用 Resolve 也能抓到直接繼承的情況
-                if (baseRef.FullName == "UnityEngine.MonoBehaviour")
+                if (baseRef.FullName == targetFullName)
                     return true;
 
                 try
@@ -113,11 +114,47 @@ namespace XPlan.Editors.Weaver
                 }
                 catch
                 {
-                    break;  // 然後最後 return false;
+                    break;  // Resolve 失敗就跳出，最後 return false
                 }
             }
 
             return false;
+        }
+
+        // 保留原本 API，內部改呼叫通用版
+        public static bool IsMonoBehaviourSubclass(TypeDefinition type)
+        {
+            return IsSubclassOf(type, "UnityEngine.MonoBehaviour");
+        }
+
+        /// <summary>
+        /// 讓 method 綁定到指定的泛型實例型別上。
+        /// 例如：
+        ///   ObservableProperty`1::get_Value  +  ObservableProperty`1<System.String>
+        /// => ObservableProperty`1<System.String>::get_Value
+        /// </summary>
+        public static MethodReference MakeHostInstanceGeneric(MethodReference method, TypeReference hostType)
+        {
+            if (method == null)
+                throw new ArgumentNullException(nameof(method));
+
+            if (hostType == null)
+                throw new ArgumentNullException(nameof(hostType));
+
+            var reference = new MethodReference(method.Name, method.ReturnType, hostType)
+            {
+                HasThis             = method.HasThis,
+                ExplicitThis        = method.ExplicitThis,
+                CallingConvention   = method.CallingConvention
+            };
+
+            foreach (var param in method.Parameters)
+                reference.Parameters.Add(new ParameterDefinition(param.ParameterType));
+
+            foreach (var gp in method.GenericParameters)
+                reference.GenericParameters.Add(new GenericParameter(gp.Name, reference));
+
+            return reference;
         }
     }
 }

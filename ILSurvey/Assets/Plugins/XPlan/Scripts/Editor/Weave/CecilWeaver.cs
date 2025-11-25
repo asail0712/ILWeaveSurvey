@@ -27,24 +27,20 @@ namespace XPlan.Editors.Weaver
         // ★ 這裡註冊所有「方法切面」
         private static readonly IMethodAspectWeaver[] _methodAspects =
         {
-            new LogAspectWeaver(),
-            new NotifyHandlerWeaver(),
-            // 之後你可以繼續加新的切面
-            // new AnotherAspectWeaver(),
+            new LogAspectWeaver(),          // 用在 Function 執行狀態的顯示
+            new NotifyHandlerWeaver(),      // 用在 Notify 的函數註冊
         };
 
         // 類別級切面
         private static readonly ITypeAspectWeaver[] _typeAspects =
-        {
-            // 例：某個 [NotifyHandler] 如果你想貼在 class 上    
+        {            
             // new SomeTypeAspectWeaver(),
         };
 
         // 欄位級切面
         private static readonly IFieldAspectWeaver[] _fieldAspects =
-        {
-            // 例：I18N 用在 Text / Image 欄位上    
-            new I18NViewWeaver(),
+        {            
+            new I18NViewWeaver(),           // I18N 用在 Text / Image 欄位上
         };
 
         static CecilWeaver()
@@ -54,6 +50,9 @@ namespace XPlan.Editors.Weaver
 
         private static void OnAssemblyCompiled(string assemblyPath, CompilerMessage[] msgs)
         {
+            if (!CecilWeaverSettings.Enabled)
+                return;
+
             try
             {
                 // 1) 編譯失敗就不處理
