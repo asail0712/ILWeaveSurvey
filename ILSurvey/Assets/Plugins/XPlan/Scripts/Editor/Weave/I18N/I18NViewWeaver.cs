@@ -25,7 +25,7 @@ namespace XPlan.Editors.Weaver
             var declaringType = targetField.DeclaringType;
 
             // 1) 檢查是否為 MonoBehaviour 子類
-            if (!IsMonoBehaviourSubclass(declaringType))
+            if (!CecilHelper.IsMonoBehaviourSubclass(declaringType))
             {
                 throw new InvalidOperationException(
                     $"[I18NViewWeaver] {declaringType.FullName} 不是 MonoBehaviour 子類，" +
@@ -55,7 +55,7 @@ namespace XPlan.Editors.Weaver
             }
 
             var rawKey  = (string)attr.ConstructorArguments[0].Value;            
-            var key     = rawKey;
+            var key     = isTextLike ? "Key_" + rawKey : rawKey; // 視需求加前綴
 
             // 4) Import runtime 類別與方法
             // ⚠ I18NWeaverRuntime 要放在 Runtime 組件（不能是 Editor-only）
@@ -65,9 +65,7 @@ namespace XPlan.Editors.Weaver
             MethodReference registerRef;
 
             if (isTextLike)
-            {
-                // 視需求加前綴
-                key                 = "Key_" + key;
+            {                
                 var registerTextDef = runtimeTypeDef.Methods.First(m =>
                     m.Name == "RegisterText" &&
                     m.Parameters.Count == 3);
@@ -134,41 +132,5 @@ namespace XPlan.Editors.Weaver
                 $"[I18NViewWeaver] 織入完成：{declaringType.FullName}.{awake.Name} → " +
                 $"{(isTextLike ? "RegisterText" : "RegisterImage")} for {targetField.Name} (key={key})");
         }
-
-        private static bool IsMonoBehaviourSubclass(TypeDefinition type)
-        {
-            if (type == null) return false;
-
-            TypeDefinition cur = type;
-
-            // 防止意外循環，設個上限
-            for (int i = 0; i < 16 && cur != null; i++)
-            {
-                // 自己就是 MonoBehaviour
-                if (cur.FullName == "UnityEngine.MonoBehaviour")
-                    return true;
-
-                var baseRef = cur.BaseType;
-                if (baseRef == null)
-                    break;
-
-                // 先用 FullName 判一次，不用 Resolve 也能抓到直接繼承的情況
-                if (baseRef.FullName == "UnityEngine.MonoBehaviour")
-                    return true;
-
-                try
-                {
-                    // 再往上爬
-                    cur = baseRef.Resolve();
-                }
-                catch
-                {
-                     break;  // 然後最後 return false;
-                }
-            }
-
-            return false;
-        }
-
     }
 }

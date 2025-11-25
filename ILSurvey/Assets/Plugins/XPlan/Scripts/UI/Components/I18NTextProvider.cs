@@ -53,15 +53,21 @@ namespace XPlan.UI.Components
         {
             if (text == null || string.IsNullOrEmpty(key)) return;
 
-            textMapper ??= new List<TextMap>();
-            textMapper.Add(new TextMap(text, key));
+            textMapper  ??= new List<TextMap>();
+            TextMap tmp = new TextMap(text, key);
+            tmp.Refresh();
+
+            textMapper.Add(tmp);
         }
 
         public void Register(TextMeshProUGUI text, string key)
         {
             if (text == null || string.IsNullOrEmpty(key)) return;
-            tmpMapper ??= new List<TmpMap>();
-            tmpMapper.Add(new TmpMap(text, key));
+            tmpMapper   ??= new List<TmpMap>();
+            TmpMap tmp  = new TmpMap(text, key);
+            tmp.Refresh();
+
+            tmpMapper.Add(tmp);
         }
 
         public void RefreshText()

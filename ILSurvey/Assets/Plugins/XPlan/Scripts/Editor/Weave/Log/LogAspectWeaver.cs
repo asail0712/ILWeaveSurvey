@@ -59,43 +59,8 @@ namespace XPlan.Editors.Weaver
             var declaringType   = targetMethod.DeclaringType;
             var userMethodName  = targetMethod.Name;
 
-            // ==== 1. 建立原始邏輯的方法（Add__Weaved），把舊 body 搬過去 ====
-            var originalMethod = new MethodDefinition(
-                userMethodName + "__Weaved",
-                targetMethod.Attributes,
-                targetMethod.ReturnType
-            );
-
-            // 複製參數
-            foreach (var p in targetMethod.Parameters)
-            {
-                originalMethod.Parameters.Add(new ParameterDefinition(p.Name, p.Attributes, p.ParameterType));
-            }
-
-            // 複製 generic 參數
-            foreach (var gp in targetMethod.GenericParameters)
-            {
-                var newGp = new GenericParameter(gp.Name, originalMethod);
-                originalMethod.GenericParameters.Add(newGp);
-            }
-
-            // 複製 body (IL、locals、EH)
-            var oldBody = targetMethod.Body;
-            originalMethod.Body = new MethodBody(originalMethod)
-            {
-                InitLocals = oldBody.InitLocals
-            };
-
-            foreach (var v in oldBody.Variables)
-                originalMethod.Body.Variables.Add(new VariableDefinition(v.VariableType));
-
-            var ilOrig = originalMethod.Body.GetILProcessor();
-            foreach (var instr in oldBody.Instructions)
-                ilOrig.Append(instr);
-
-            foreach (var eh in oldBody.ExceptionHandlers)
-                originalMethod.Body.ExceptionHandlers.Add(eh);
-
+            // ==== 1. 用 CecilHelper 建立原始邏輯方法，把舊 body 搬過去 ====
+            MethodDefinition originalMethod = CecilHelper.CloneAsOriginalMethod(targetMethod);
             declaringType.Methods.Add(originalMethod);
 
             // ==== 2. 清掉原方法 body，重建成 wrapper ====
@@ -170,7 +135,7 @@ namespace XPlan.Editors.Weaver
 
             il.Emit(OpCodes.Ret);
 
-            Debug.Log($"[Weaver] LogAspect 注入完成：{displayName}");
+            Debug.Log($"[LogAspectWeaver] LogAspect 注入完成：{displayName}");
         }
     }
 }

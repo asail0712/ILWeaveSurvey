@@ -88,8 +88,11 @@ namespace XPlan.UI.Components
         {
             if (img == null || string.IsNullOrEmpty(fileName)) return;
 
-            imgMapper ??= new List<ImageMapper>();
-            imgMapper.Add(new ImageMapper(img, fileName));
+            imgMapper       ??= new List<ImageMapper>();
+            ImageMapper tmp = new ImageMapper(img, fileName);
+            tmp.Refresh();
+
+            imgMapper.Add(tmp);
         }
 
         public void RefreshImage()

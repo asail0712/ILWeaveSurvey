@@ -33,7 +33,17 @@ namespace XPlan.Editors.Weaver
             var msgTypeRef      = module.ImportReference((TypeReference)attr.ConstructorArguments[0].Value);
 
             // 2) 找到宣告型別（或其 base type）上的 RegisterNotify<T>(Action<T>) 定義
-            var registerNotifyDef = FindRegisterNotifyDefinition(declaringType);
+            var registerNotifyDef = CecilHelper.FindMethodInHierarchy(
+                                    declaringType,
+                                    m =>
+                                        m.Name == "RegisterNotify" &&
+                                        m.HasGenericParameters &&
+                                        m.GenericParameters.Count == 1 &&
+                                        m.Parameters.Count == 1 &&
+                                        m.Parameters[0].ParameterType.Namespace == "System" &&
+                                        m.Parameters[0].ParameterType.Name.StartsWith("Action`1")
+                                    );
+
             if (registerNotifyDef == null)
             {
                 Debug.LogWarning($"[Weaver] 無法在 {declaringType.FullName} 或其基底類別上找到 " +
@@ -46,7 +56,7 @@ namespace XPlan.Editors.Weaver
             var actionGeneric   = new GenericInstanceType(actionOpenType);              // Action<...>
             actionGeneric.GenericArguments.Add(msgTypeRef);
 
-            var actionCtorDef = actionOpenType.Resolve()
+            var actionCtorDef   = actionOpenType.Resolve()
                 .Methods.First(m => m.IsConstructor && m.Parameters.Count == 2);
 
             // 建一個「關閉後的」Action<TMsg>.ctor method reference
@@ -73,7 +83,7 @@ namespace XPlan.Editors.Weaver
                 if (!ctor.HasBody)
                     continue;
 
-                var il = ctor.Body.GetILProcessor();
+                var il  = ctor.Body.GetILProcessor();
                 var ret = ctor.Body.Instructions.Last(i => i.OpCode == OpCodes.Ret);
 
                 // this
@@ -88,36 +98,7 @@ namespace XPlan.Editors.Weaver
                 il.InsertBefore(ret, il.Create(OpCodes.Call, registerNotifyGeneric));
             }
 
-            Debug.Log($"[Weaver] NotifyHandler 注入完成：{declaringType.FullName}.{targetMethod.Name}");
-        }
-
-        /// <summary>
-        /// 從 type 往上找，找到第一個符合：
-        ///   void RegisterNotify<T>(Action<T>)
-        /// 的 MethodDefinition
-        /// </summary>
-        private static MethodDefinition FindRegisterNotifyDefinition(TypeDefinition typeDef)
-        {
-            while (typeDef != null)
-            {
-                var method = typeDef.Methods.FirstOrDefault(m =>
-                    m.Name == "RegisterNotify" &&
-                    m.HasGenericParameters &&
-                    m.GenericParameters.Count == 1 &&
-                    m.Parameters.Count == 1 &&
-                    m.Parameters[0].ParameterType.Namespace == "System" &&
-                    m.Parameters[0].ParameterType.Name.StartsWith("Action`1")
-                );
-
-                if (method != null)
-                    return method;
-
-                // 往 base type 爬
-                var baseType    = typeDef.BaseType?.Resolve();
-                typeDef         = baseType;
-            }
-
-            return null;
+            Debug.Log($"[NotifyHandlerWeaver] NotifyHandler 注入完成：{declaringType.FullName}.{targetMethod.Name}");
         }
     }
 }
