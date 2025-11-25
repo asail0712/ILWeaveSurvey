@@ -5,7 +5,7 @@ using System.Linq;
 
 using UnityEngine;
 
-using static XPlan.Editors.Weaver.CecilWeaver;
+using XPlan.Weaver.Abstractions;
 
 namespace XPlan.Editors.Weaver
 {

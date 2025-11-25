@@ -1,10 +1,11 @@
 ﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using XPlan.UI;
 using XPlan.UI.Components;
 using XPlan.Utility; // 如果有 StringTable.Instance 等
 
-namespace XPlan.Editors.Weaver
+namespace XPlan.Weaver.Runtime
 {
     public static class I18NWeaverRuntime
     {

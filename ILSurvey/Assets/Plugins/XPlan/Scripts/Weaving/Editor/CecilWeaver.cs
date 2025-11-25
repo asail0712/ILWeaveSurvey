@@ -10,6 +10,8 @@ using UnityEngine;
 
 using Mono.Cecil;
 
+using XPlan.Weaver.Abstractions;
+
 namespace XPlan.Editors.Weaver
 {
     [InitializeOnLoad]
@@ -24,27 +26,31 @@ namespace XPlan.Editors.Weaver
             // 之後你可以繼續加新的Dll
         };
 
-        // ★ 這裡註冊所有「方法切面」
-        private static readonly IMethodAspectWeaver[] _methodAspects =
-        {
-            new LogAspectWeaver(),          // 用在 Function 執行狀態的顯示
-            new NotifyHandlerWeaver(),      // 用在 Notify 的函數註冊
-        };
-
-        // 類別級切面
-        private static readonly ITypeAspectWeaver[] _typeAspects =
-        {            
-            // new SomeTypeAspectWeaver(),
-        };
-
-        // 欄位級切面
-        private static readonly IFieldAspectWeaver[] _fieldAspects =
-        {            
-            new I18NViewWeaver(),           // I18N 用在 Text / Image 欄位上
-        };
+        private static readonly IMethodAspectWeaver[] _methodAspects;
+        private static readonly ITypeAspectWeaver[] _typeAspects;
+        private static readonly IFieldAspectWeaver[] _fieldAspects;
 
         static CecilWeaver()
         {
+            // 自動掃描所有 IMethodAspectWeaver / IFieldAspectWeaver / ITypeAspectWeaver
+            // 內建的Weaving放在XPlan/Weaving/Editor
+            _methodAspects  = FindAllInstances<IMethodAspectWeaver>();
+            _typeAspects    = FindAllInstances<ITypeAspectWeaver>();
+            _fieldAspects   = FindAllInstances<IFieldAspectWeaver>();
+
+            // ★ Log: 顯示找到的 weaver
+            Debug.Log($"[CecilWeaver] Method Weavers: {_methodAspects.Length}");
+            foreach (var w in _methodAspects)
+                Debug.Log($"  - {w.GetType().FullName}");
+
+            Debug.Log($"[CecilWeaver] Type Weavers: {_typeAspects.Length}");
+            foreach (var w in _typeAspects)
+                Debug.Log($"  - {w.GetType().FullName}");
+
+            Debug.Log($"[CecilWeaver] Field Weavers: {_fieldAspects.Length}");
+            foreach (var w in _fieldAspects)
+                Debug.Log($"  - {w.GetType().FullName}");
+
             CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompiled;
         }
 
@@ -315,26 +321,22 @@ namespace XPlan.Editors.Weaver
                 File.Move(temp, target);
         }
 
-        /****************************************
-         * 切面介面：所有級別的 Aspect 都實作它們
-         ****************************************/
-        public interface IMethodAspectWeaver
+        private static TWeaver[] FindAllInstances<TWeaver>()
         {
-            string AttributeFullName { get; }
-
-            void Apply(ModuleDefinition module, MethodDefinition targetMethod, CustomAttribute attr);
-        }
-
-        public interface ITypeAspectWeaver
-        {
-            string AttributeFullName { get; }
-            void Apply(ModuleDefinition module, TypeDefinition targetType, CustomAttribute attr);
-        }
-
-        public interface IFieldAspectWeaver
-        {
-            string AttributeFullName { get; }
-            void Apply(ModuleDefinition module, FieldDefinition targetField, CustomAttribute attr);
+            return AppDomain.CurrentDomain.GetAssemblies()
+                // 只抓 Editor 類型的 asm（避免跑到 runtime）
+                .Where(a => !a.IsDynamic && a.FullName.Contains("Editor"))
+                .SelectMany(a =>
+                {
+                    try { return a.GetTypes(); }
+                    catch { return Array.Empty<Type>(); }
+                })
+                .Where(t =>
+                    typeof(TWeaver).IsAssignableFrom(t) &&
+                    !t.IsAbstract &&
+                    t.GetConstructor(Type.EmptyTypes) != null)
+                .Select(t => (TWeaver)Activator.CreateInstance(t))
+                .ToArray();
         }
     }
 }

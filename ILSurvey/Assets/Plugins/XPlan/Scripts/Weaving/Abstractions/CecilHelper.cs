@@ -3,9 +3,9 @@ using Mono.Cecil.Cil;
 using System;
 using System.Linq;
 
-namespace XPlan.Editors.Weaver
+namespace XPlan.Weaver.Abstractions
 {
-    internal static class CecilHelper
+    public static class CecilHelper
     {
         /// <summary>
         /// 把 targetMethod 的 body / 參數 / 泛型 / locals / EH
@@ -18,7 +18,7 @@ namespace XPlan.Editors.Weaver
             var userMethodName  = targetMethod.Name;
 
             // 建立新的方法：Add__Weaved
-            var originalMethod = new MethodDefinition(
+            var originalMethod  = new MethodDefinition(
                 userMethodName + suffix,
                 targetMethod.Attributes,
                 targetMethod.ReturnType

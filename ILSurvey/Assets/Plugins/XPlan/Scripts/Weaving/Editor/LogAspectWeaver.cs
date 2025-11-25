@@ -5,7 +5,7 @@ using System.Linq;
 
 using UnityEngine;
 
-using static XPlan.Editors.Weaver.CecilWeaver;
+using XPlan.Weaver.Abstractions;
 
 /*************************************************
 * LogAspect 的實作：原本 Patch_LogAspect 搬進來

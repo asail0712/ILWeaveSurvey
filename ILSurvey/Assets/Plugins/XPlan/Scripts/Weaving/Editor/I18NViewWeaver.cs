@@ -5,7 +5,7 @@ using System.Linq;
 
 using UnityEngine;
 
-using static XPlan.Editors.Weaver.CecilWeaver;
+using XPlan.Weaver.Abstractions;
 
 namespace XPlan.Editors.Weaver
 {
@@ -59,7 +59,7 @@ namespace XPlan.Editors.Weaver
 
             // 4) Import runtime 類別與方法
             // ⚠ I18NWeaverRuntime 要放在 Runtime 組件（不能是 Editor-only）
-            var runtimeTypeRef = module.ImportReference(typeof(XPlan.Editors.Weaver.I18NWeaverRuntime));
+            var runtimeTypeRef = module.ImportReference(typeof(XPlan.Weaver.Runtime.I18NWeaverRuntime));
             var runtimeTypeDef = runtimeTypeRef.Resolve();
 
             MethodReference registerRef;
