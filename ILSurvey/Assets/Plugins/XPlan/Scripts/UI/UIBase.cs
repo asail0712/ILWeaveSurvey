@@ -361,12 +361,12 @@ namespace XPlan.UI
 		 * *****************************/
         protected string GetStr(string keyStr)
 		{
-			return UIController.Instance.GetStr(keyStr);
+			return StringTable.Instance.GetStr(keyStr);
 		}
 
         protected string ReplaceStr(string keyStr, params string[] paramList)
         {
-            return UIController.Instance.ReplaceStr(keyStr, paramList);
+            return StringTable.Instance.ReplaceStr(keyStr, paramList);
         }
 
         protected void DefaultToggleBtns(Button[] btns)

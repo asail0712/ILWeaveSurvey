@@ -1,0 +1,174 @@
+﻿using Mono.Cecil;
+using Mono.Cecil.Cil;
+using System;
+using System.Linq;
+
+using UnityEngine;
+
+using static XPlan.Editors.Weaver.CecilWeaver;
+
+namespace XPlan.Editors.Weaver
+{
+    /// <summary>
+    /// 處理貼在欄位上的 [XPlan.I18N.I18NViewAttribute]：
+    /// 1. 檢查欄位宣告類別是否為 MonoBehaviour 子類
+    /// 2. 檢查欄位型別：Text / TMP or Image
+    /// 3. 在該類別的 Awake() 開頭插入註冊呼叫
+    /// </summary>
+    internal sealed class I18NViewWeaver : IFieldAspectWeaver
+    {
+        // 欄位上的 Attribute
+        public string AttributeFullName => "XPlan.I18NViewAttribute";
+
+        public void Apply(ModuleDefinition module, FieldDefinition targetField, CustomAttribute attr)
+        {
+            var declaringType = targetField.DeclaringType;
+
+            // 1) 檢查是否為 MonoBehaviour 子類
+            if (!IsMonoBehaviourSubclass(declaringType))
+            {
+                throw new InvalidOperationException(
+                    $"[I18NViewWeaver] {declaringType.FullName} 不是 MonoBehaviour 子類，" +
+                    $"欄位 {targetField.FullName} 不允許使用 [I18NViewAttribute]");
+            }
+
+            // 2) 檢查欄位型別，判斷是 Text / TMP 還是 Image
+            var fieldTypeFullName   = targetField.FieldType.FullName;
+            bool isTextLike         =
+                                        fieldTypeFullName == "UnityEngine.UI.Text" ||
+                                        fieldTypeFullName == "TMPro.TextMeshProUGUI";
+            bool isImageLike        =
+                                        fieldTypeFullName == "UnityEngine.UI.Image";
+
+            if (!isTextLike && !isImageLike)
+            {
+                throw new InvalidOperationException(
+                    $"[I18NViewWeaver] 欄位 {targetField.FullName} 被標記為 I18NView，" +
+                    $"但型別 {fieldTypeFullName} 不是 Text/TMP/Image 之一");
+            }
+
+            // 3) 從 Attribute 讀取 key（假設 ctor 第一個參數就是 key）
+            if (attr.ConstructorArguments.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"[I18NViewWeaver] {targetField.FullName} 的 I18NViewAttribute 構造參數數量錯誤（預期 1）");
+            }
+
+            var rawKey  = (string)attr.ConstructorArguments[0].Value;            
+            var key     = rawKey;
+
+            // 4) Import runtime 類別與方法
+            // ⚠ I18NWeaverRuntime 要放在 Runtime 組件（不能是 Editor-only）
+            var runtimeTypeRef = module.ImportReference(typeof(XPlan.Editors.Weaver.I18NWeaverRuntime));
+            var runtimeTypeDef = runtimeTypeRef.Resolve();
+
+            MethodReference registerRef;
+
+            if (isTextLike)
+            {
+                // 視需求加前綴
+                key                 = "Key_" + key;
+                var registerTextDef = runtimeTypeDef.Methods.First(m =>
+                    m.Name == "RegisterText" &&
+                    m.Parameters.Count == 3);
+
+                registerRef = module.ImportReference(registerTextDef);
+            }
+            else // isImageLike
+            {
+                var registerImageDef = runtimeTypeDef.Methods.First(m =>
+                    m.Name == "RegisterImage" &&
+                    m.Parameters.Count == 3);
+
+                registerRef = module.ImportReference(registerImageDef);
+            }
+
+            // 5) 取得或建立 Awake() 方法（非 static、無參數、void）
+            var awake = declaringType.Methods.FirstOrDefault(m =>
+                m.Name == "Awake" &&
+                !m.IsStatic &&
+                !m.HasParameters &&
+                m.ReturnType.FullName == "System.Void");
+
+            if (awake == null)
+            {
+                awake = new MethodDefinition(
+                    "Awake",
+                    MethodAttributes.Public | MethodAttributes.HideBySig,
+                    module.TypeSystem.Void);
+
+                awake.Body = new MethodBody(awake);
+                var ilAwake = awake.Body.GetILProcessor();
+                ilAwake.Append(ilAwake.Create(OpCodes.Ret));
+
+                declaringType.Methods.Add(awake);
+            }
+
+            var il          = awake.Body.GetILProcessor();
+            var firstInstr  = awake.Body.Instructions.FirstOrDefault();
+
+            if (firstInstr == null)
+            {
+                // 理論上不會，因為上面有保底加 Ret
+                firstInstr = il.Create(OpCodes.Ret);
+                il.Append(firstInstr);
+            }
+
+            // 6) 在 Awake 開頭插入註冊呼叫
+            // C# 概念：
+            // I18NWeaverRuntime.RegisterX(this, this.<field>, "Key_xxx");
+
+            var ldThis1 = il.Create(OpCodes.Ldarg_0);      // this (view)
+            var ldThis2 = il.Create(OpCodes.Ldarg_0);      // this (for ldfld)
+            var ldfld   = il.Create(OpCodes.Ldfld, targetField);
+            var ldKey   = il.Create(OpCodes.Ldstr, key);
+            var call    = il.Create(OpCodes.Call, registerRef);
+
+            il.InsertBefore(firstInstr, call);
+            il.InsertBefore(call, ldKey);
+            il.InsertBefore(ldKey, ldfld);
+            il.InsertBefore(ldfld, ldThis2);
+            il.InsertBefore(ldThis2, ldThis1);
+
+            Debug.Log(
+                $"[I18NViewWeaver] 織入完成：{declaringType.FullName}.{awake.Name} → " +
+                $"{(isTextLike ? "RegisterText" : "RegisterImage")} for {targetField.Name} (key={key})");
+        }
+
+        private static bool IsMonoBehaviourSubclass(TypeDefinition type)
+        {
+            if (type == null) return false;
+
+            TypeDefinition cur = type;
+
+            // 防止意外循環，設個上限
+            for (int i = 0; i < 16 && cur != null; i++)
+            {
+                // 自己就是 MonoBehaviour
+                if (cur.FullName == "UnityEngine.MonoBehaviour")
+                    return true;
+
+                var baseRef = cur.BaseType;
+                if (baseRef == null)
+                    break;
+
+                // 先用 FullName 判一次，不用 Resolve 也能抓到直接繼承的情況
+                if (baseRef.FullName == "UnityEngine.MonoBehaviour")
+                    return true;
+
+                try
+                {
+                    // 再往上爬
+                    cur = baseRef.Resolve();
+                }
+                catch
+                {
+                     break;  // 然後最後 return false;
+                }
+            }
+
+            return false;
+        }
+
+    }
+}

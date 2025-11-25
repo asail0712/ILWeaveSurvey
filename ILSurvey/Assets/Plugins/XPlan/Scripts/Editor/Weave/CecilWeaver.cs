@@ -25,12 +25,26 @@ namespace XPlan.Editors.Weaver
         };
 
         // ★ 這裡註冊所有「方法切面」
-        private static readonly IMethodAspectWeaver[] _aspects =
+        private static readonly IMethodAspectWeaver[] _methodAspects =
         {
             new LogAspectWeaver(),
             new NotifyHandlerWeaver(),
             // 之後你可以繼續加新的切面
             // new AnotherAspectWeaver(),
+        };
+
+        // 類別級切面
+        private static readonly ITypeAspectWeaver[] _typeAspects =
+        {
+            // 例：某個 [NotifyHandler] 如果你想貼在 class 上    
+            // new SomeTypeAspectWeaver(),
+        };
+
+        // 欄位級切面
+        private static readonly IFieldAspectWeaver[] _fieldAspects =
+        {
+            // 例：I18N 用在 Text / Image 欄位上    
+            new I18NViewWeaver(),
         };
 
         static CecilWeaver()
@@ -138,12 +152,48 @@ namespace XPlan.Editors.Weaver
             using (var module = ModuleDefinition.ReadModule(assemblyPath, rp))
             {
                 // ★ 統一收集「要被織入的項目」
-                var targets = new List<(IMethodAspectWeaver aspect, MethodDefinition method, CustomAttribute attr)>();
+                var methodTargets   = new List<(IMethodAspectWeaver aspect, MethodDefinition method, CustomAttribute attr)>();
+                var typeTargets     = new List<(ITypeAspectWeaver aspect, TypeDefinition type, CustomAttribute attr)>();
+                var fieldTargets    = new List<(IFieldAspectWeaver aspect, FieldDefinition field, CustomAttribute attr)>();
 
                 foreach (var type in module.Types)
                 {
                     foreach (var nestedType in GetAllNestedTypes(type))
                     {
+                        // ① 類別屬性
+                        if (nestedType.HasCustomAttributes)
+                        {
+                            foreach (var attr in nestedType.CustomAttributes)
+                            {
+                                foreach (var aspect in _typeAspects)
+                                {
+                                    if (attr.AttributeType.FullName == aspect.AttributeFullName)
+                                    {
+                                        typeTargets.Add((aspect, nestedType, attr));
+                                    }
+                                }
+                            }
+                        }
+
+                        // ② 欄位屬性
+                        foreach (var field in nestedType.Fields)
+                        {
+                            if (!field.HasCustomAttributes)
+                                continue;
+
+                            foreach (var attr in field.CustomAttributes)
+                            {
+                                foreach (var aspect in _fieldAspects)
+                                {
+                                    if (attr.AttributeType.FullName == aspect.AttributeFullName)
+                                    {
+                                        fieldTargets.Add((aspect, field, attr));
+                                    }
+                                }
+                            }
+                        }
+
+                        // ③ 方法屬性（你原本的邏輯）
                         foreach (var method in nestedType.Methods)
                         {
                             if (!method.HasBody || !method.HasCustomAttributes)
@@ -151,12 +201,11 @@ namespace XPlan.Editors.Weaver
 
                             foreach (var attr in method.CustomAttributes)
                             {
-                                // 試著看看有沒有 Aspect 想處理這個 Attribute
-                                foreach (var aspect in _aspects)
+                                foreach (var aspect in _methodAspects)
                                 {
                                     if (attr.AttributeType.FullName == aspect.AttributeFullName)
                                     {
-                                        targets.Add((aspect, method, attr));
+                                        methodTargets.Add((aspect, method, attr));
                                     }
                                 }
                             }
@@ -164,21 +213,45 @@ namespace XPlan.Editors.Weaver
                     }
                 }
 
-                if (targets.Count == 0)
+                if (typeTargets.Count == 0 && fieldTargets.Count == 0 && methodTargets.Count == 0)
                 {
                     Debug.Log("[Weaver] 找不到任何可處理的切面標記，略過");
                 }
                 else
                 {
-                    foreach (var (aspect, method, attr) in targets)
+                    foreach (var (aspect, t, attr) in typeTargets)
                     {
                         try
                         {
-                            aspect.Apply(module, method, attr);
+                            aspect.Apply(module, t, attr);
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogError($"[Weaver] Aspect {aspect.GetType().Name} 織入 {method.FullName} 失敗：{ex}");
+                            Debug.LogError($"[Weaver] TypeAspect {aspect.GetType().Name} 織入 {t.FullName} 失敗：{ex}");
+                        }
+                    }
+
+                    foreach (var (aspect, f, attr) in fieldTargets)
+                    {
+                        try
+                        {
+                            aspect.Apply(module, f, attr);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError($"[Weaver] FieldAspect {aspect.GetType().Name} 織入 {f.FullName} 失敗：{ex}");
+                        }
+                    }
+
+                    foreach (var (aspect, m, attr) in methodTargets)
+                    {
+                        try
+                        {
+                            aspect.Apply(module, m, attr);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError($"[Weaver] MethodAspect {aspect.GetType().Name} 織入 {m.FullName} 失敗：{ex}");
                         }
                     }
                 }
@@ -244,13 +317,25 @@ namespace XPlan.Editors.Weaver
         }
 
         /****************************************
-         * 切面介面：所有方法級別的 Aspect 都實作它
+         * 切面介面：所有級別的 Aspect 都實作它們
          ****************************************/
         public interface IMethodAspectWeaver
         {
             string AttributeFullName { get; }
 
             void Apply(ModuleDefinition module, MethodDefinition targetMethod, CustomAttribute attr);
+        }
+
+        public interface ITypeAspectWeaver
+        {
+            string AttributeFullName { get; }
+            void Apply(ModuleDefinition module, TypeDefinition targetType, CustomAttribute attr);
+        }
+
+        public interface IFieldAspectWeaver
+        {
+            string AttributeFullName { get; }
+            void Apply(ModuleDefinition module, FieldDefinition targetField, CustomAttribute attr);
         }
     }
 }
