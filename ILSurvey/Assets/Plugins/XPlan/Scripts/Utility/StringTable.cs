@@ -159,7 +159,7 @@ namespace XPlan.Utility
 
 				foreach (IUIView ui in uiList)
 				{
-					ui.RefreshLanguage();
+					ui.RefreshLanguage(currLang);
 				}
 			}
 		}
