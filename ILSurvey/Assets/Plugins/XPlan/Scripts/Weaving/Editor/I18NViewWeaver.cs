@@ -54,7 +54,7 @@ namespace XPlan.Editors.Weaver
                     $"[I18NViewWeaver] {targetField.FullName} 的 I18NViewAttribute 構造參數數量錯誤（預期 1）");
             }
 
-            var rawKey  = (string)attr.ConstructorArguments[0].Value;            
+            var rawKey  = (string)attr.ConstructorArguments[0].Value;
             var key     = isTextLike ? "Key_" + rawKey : rawKey; // 視需求加前綴
 
             // 4) Import runtime 類別與方法
@@ -65,7 +65,7 @@ namespace XPlan.Editors.Weaver
             MethodReference registerRef;
 
             if (isTextLike)
-            {                
+            {
                 var registerTextDef = runtimeTypeDef.Methods.First(m =>
                     m.Name == "RegisterText" &&
                     m.Parameters.Count == 3);
@@ -81,29 +81,30 @@ namespace XPlan.Editors.Weaver
                 registerRef = module.ImportReference(registerImageDef);
             }
 
-            // 5) 取得或建立 Awake() 方法（非 static、無參數、void）
-            var awake = declaringType.Methods.FirstOrDefault(m =>
-                m.Name == "Awake" &&
+            // 5) 取得或建立 Start() 方法（非 static、無參數、void）
+            // ViewBase有使用到Awake 因此改用Start避開
+            var start = declaringType.Methods.FirstOrDefault(m =>
+                m.Name == "Start" &&
                 !m.IsStatic &&
                 !m.HasParameters &&
                 m.ReturnType.FullName == "System.Void");
 
-            if (awake == null)
+            if (start == null)
             {
-                awake = new MethodDefinition(
-                    "Awake",
+                start = new MethodDefinition(
+                    "Start",
                     MethodAttributes.Public | MethodAttributes.HideBySig,
                     module.TypeSystem.Void);
 
-                awake.Body = new MethodBody(awake);
-                var ilAwake = awake.Body.GetILProcessor();
+                start.Body  = new MethodBody(start);
+                var ilAwake = start.Body.GetILProcessor();
                 ilAwake.Append(ilAwake.Create(OpCodes.Ret));
 
-                declaringType.Methods.Add(awake);
+                declaringType.Methods.Add(start);
             }
 
-            var il          = awake.Body.GetILProcessor();
-            var firstInstr  = awake.Body.Instructions.FirstOrDefault();
+            var il          = start.Body.GetILProcessor();
+            var firstInstr  = start.Body.Instructions.FirstOrDefault();
 
             if (firstInstr == null)
             {
@@ -112,7 +113,7 @@ namespace XPlan.Editors.Weaver
                 il.Append(firstInstr);
             }
 
-            // 6) 在 Awake 開頭插入註冊呼叫
+            // 6) 在 Start 開頭插入註冊呼叫
             // C# 概念：
             // I18NWeaverRuntime.RegisterX(this, this.<field>, "Key_xxx");
 
@@ -129,7 +130,7 @@ namespace XPlan.Editors.Weaver
             il.InsertBefore(ldThis2, ldThis1);
 
             Debug.Log(
-                $"[I18NViewWeaver] 織入完成：{declaringType.FullName}.{awake.Name} → " +
+                $"[I18NViewWeaver] 織入完成：{declaringType.FullName}.{start.Name} → " +
                 $"{(isTextLike ? "RegisterText" : "RegisterImage")} for {targetField.Name} (key={key})");
         }
     }

@@ -29,7 +29,7 @@ namespace XPlan.Utility
         protected override void InitSingleton()
         {
             currLang	= 0;
-            stringTable = new Dictionary<string, List<string>>();
+            stringTable = new Dictionary<string, List<string>>(System.StringComparer.OrdinalIgnoreCase);
         }
 
         public void InitialStringTable(TextAsset[] csvAssetList)

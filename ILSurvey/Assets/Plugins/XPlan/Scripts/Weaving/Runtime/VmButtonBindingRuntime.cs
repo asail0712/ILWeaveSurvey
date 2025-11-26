@@ -113,10 +113,12 @@ namespace XPlan.Weaver.Runtime
                 {
                     if (typeof(Button).IsAssignableFrom(f.FieldType))
                     {
-                        var btn = f.GetValue(viewInstance) as Button;
-                        if (btn != null && !dict.ContainsKey(f.Name))
+                        var btn             = f.GetValue(viewInstance) as Button;
+                        var normalizeName   = NormalizeName(f.Name);
+
+                        if (btn != null && !dict.ContainsKey(normalizeName))
                         {
-                            dict.Add(f.Name, btn);
+                            dict.Add(normalizeName, btn);
                         }
                     }
                 }
@@ -192,20 +194,11 @@ namespace XPlan.Weaver.Runtime
             if (map.TryGetValue(buttonNameCore, out button))
                 return true;
 
-            // 加上 Btn：DemoTriggerBtn
-            var withBtn = buttonNameCore + "Btn";
-            if (map.TryGetValue(withBtn, out button))
-                return true;
-
             // 首字小寫：demoTrigger / demoTriggerBtn
             var camel = char.ToLowerInvariant(buttonNameCore[0]) +
                         buttonNameCore.Substring(1);
 
             if (map.TryGetValue(camel, out button))
-                return true;
-
-            var camelBtn = camel + "Btn";
-            if (map.TryGetValue(camelBtn, out button))
                 return true;
 
             // 都沒有命中就失敗
@@ -238,6 +231,47 @@ namespace XPlan.Weaver.Runtime
             }
 
             return null;
+        }
+
+        private static readonly string[] Prefixes =
+        {
+            "_",
+            "m_"
+        };
+
+        private static readonly string[] Suffixes =
+        {
+            "Btn",
+            "btn",
+            "Button",
+            "button"
+        };
+
+        private static string NormalizeName(string raw)
+        {
+            string name = raw;
+
+            // 移除前綴（Prefix）
+            foreach (var p in Prefixes)
+            {
+                if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name.Substring(p.Length);
+                    break;
+                }
+            }
+
+            // 移除後綴（Suffix）
+            foreach (var s in Suffixes)
+            {
+                if (name.EndsWith(s, StringComparison.OrdinalIgnoreCase))
+                {
+                    name = name.Substring(0, name.Length - s.Length);
+                    break;
+                }
+            }
+
+            return name;
         }
     }
 }

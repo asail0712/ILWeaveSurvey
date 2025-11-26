@@ -13,7 +13,7 @@ namespace XPlan.Editors.Weaver
             set => EditorPrefs.SetBool(Key, value);
         }
 
-        [MenuItem("XPlanTools/Weaver/Toggle Enabled")]
+        [MenuItem("XPlanTools/Weaver/Toggle Enabled", false, 9)]
         private static void Toggle()
         {
             Enabled = !Enabled;
@@ -21,7 +21,7 @@ namespace XPlan.Editors.Weaver
         }
 
         // ★ 新增：手動觸發 Weave
-        [MenuItem("XPlanTools/Weaver/Run Weaver Now")]
+        [MenuItem("XPlanTools/Weaver/Run Weaver Now", false, 0)]
         private static void RunWeaverNow()
         {
             // 直接呼叫公開 AP
