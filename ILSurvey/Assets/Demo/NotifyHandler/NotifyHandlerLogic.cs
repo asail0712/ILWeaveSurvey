@@ -17,7 +17,7 @@ namespace WeaveTarget
 
     public class NotifyHandlerLogic : LogicComponent
     {
-        [NotifyHandler(typeof(DemoMessage))]
+        [NotifyHandler]
         private void ShowMessage(DemoMessage msg)
         {
             Debug.Log(msg.demoStr);

@@ -9,75 +9,65 @@ using XPlan.Weaver.Abstractions;
 
 namespace XPlan.Editors.Weaver
 {
-    /// <summary>
-    /// [NotifyHandler(typeof(TMsg))] 的 IL Weaving 實作：
-    /// 會在宣告該方法的型別建構子中，自動插入：
-    ///   RegisterNotify<TMsg>(msg => Handler(msg));
-    /// </summary>
     internal sealed class NotifyHandlerWeaver : IMethodAspectWeaver
     {
-        // 要跟 Attribute 的 FullName 對得起來
         public string AttributeFullName => "XPlan.NotifyHandlerAttribute";
 
         public void Apply(ModuleDefinition module, MethodDefinition targetMethod, CustomAttribute attr)
         {
-            // targetMethod 就是貼了 [NotifyHandler] 的那個方法，例如：
-            // private void ShowError(LoginErrorMsg msg)
+            var declaringType = targetMethod.DeclaringType;
 
-            if (attr.ConstructorArguments.Count != 1)
-                throw new InvalidOperationException("[NotifyHandler] 構造參數錯誤，缺少 messageType");
+            // ★★ 1) 不再從 Attribute 拿 Type，而是從方法參數自動推斷 ★★
+            if (!targetMethod.HasParameters || targetMethod.Parameters.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"[NotifyHandler] {targetMethod.FullName} 必須僅有一個參數（訊息類型）");
+            }
 
-            var declaringType   = targetMethod.DeclaringType;
+            // 方法參數型別 = TMsg
+            var msgTypeRef          = module.ImportReference(targetMethod.Parameters[0].ParameterType);
 
-            // 1) 從 Attribute 取得訊息型別：typeof(LoginErrorMsg)
-            var msgTypeRef      = module.ImportReference((TypeReference)attr.ConstructorArguments[0].Value);
-
-            // 2) 找到宣告型別（或其 base type）上的 RegisterNotify<T>(Action<T>) 定義
-            var registerNotifyDef = CecilHelper.FindMethodInHierarchy(
-                                    declaringType,
-                                    m =>
-                                        m.Name == "RegisterNotify" &&
-                                        m.HasGenericParameters &&
-                                        m.GenericParameters.Count == 1 &&
-                                        m.Parameters.Count == 1 &&
-                                        m.Parameters[0].ParameterType.Namespace == "System" &&
-                                        m.Parameters[0].ParameterType.Name.StartsWith("Action`1")
-                                    );
+            // ★ 找 RegisterNotify<TMsg>(Action<TMsg>)
+            var registerNotifyDef   = CecilHelper.FindMethodInHierarchy(
+                declaringType,
+                m =>
+                    m.Name == "RegisterNotify" &&
+                    m.HasGenericParameters &&
+                    m.GenericParameters.Count == 1 &&
+                    m.Parameters.Count == 1 &&
+                    m.Parameters[0].ParameterType.Namespace == "System" &&
+                    m.Parameters[0].ParameterType.Name.StartsWith("Action`1")
+            );
 
             if (registerNotifyDef == null)
             {
-                Debug.LogWarning($"[Weaver] 無法在 {declaringType.FullName} 或其基底類別上找到 " +
-                                 "RegisterNotify<T>(Action<T>)，略過 NotifyHandler 注入。");
+                Debug.LogWarning($"[NotifyHandlerWeaver] 無法在 {declaringType.FullName} 找到 RegisterNotify<T>，略過 weaving");
                 return;
             }
 
-            // 3) 準備 Action<TMsg> 的 .ctor 參考
-            var actionOpenType  = module.ImportReference(typeof(Action<>));             // System.Action`1
-            var actionGeneric   = new GenericInstanceType(actionOpenType);              // Action<...>
+            // ★ Construct Action<TMsg>
+            var actionOpenType  = module.ImportReference(typeof(Action<>));
+            var actionGeneric   = new GenericInstanceType(actionOpenType);
             actionGeneric.GenericArguments.Add(msgTypeRef);
 
             var actionCtorDef   = actionOpenType.Resolve()
                 .Methods.First(m => m.IsConstructor && m.Parameters.Count == 2);
 
-            // 建一個「關閉後的」Action<TMsg>.ctor method reference
-            var actionCtorRef = new MethodReference(".ctor", module.TypeSystem.Void, actionGeneric)
+            var actionCtorRef   = new MethodReference(".ctor", module.TypeSystem.Void, actionGeneric)
             {
                 HasThis             = true,
                 ExplicitThis        = false,
                 CallingConvention   = actionCtorDef.CallingConvention
             };
             foreach (var p in actionCtorDef.Parameters)
-            {
                 actionCtorRef.Parameters.Add(new ParameterDefinition(p.ParameterType));
-            }
 
-            // 4) 準備 RegisterNotify<TMsg> 的 generic instance method
+            // ★ Construct RegisterNotify<TMsg>
             var registerNotifyRef       = module.ImportReference(registerNotifyDef);
             var registerNotifyGeneric   = new GenericInstanceMethod(registerNotifyRef);
             registerNotifyGeneric.GenericArguments.Add(msgTypeRef);
 
-            // 5) 對所有「實例建構子」插入：
-            // this.RegisterNotify<TMsg>(new Action<TMsg>(this, &Handler));
+            // ★ 注入到所有 instance constructors
             foreach (var ctor in declaringType.Methods.Where(m => m.IsConstructor && !m.IsStatic))
             {
                 if (!ctor.HasBody)
@@ -86,19 +76,14 @@ namespace XPlan.Editors.Weaver
                 var il  = ctor.Body.GetILProcessor();
                 var ret = ctor.Body.Instructions.Last(i => i.OpCode == OpCodes.Ret);
 
-                // this
-                il.InsertBefore(ret, il.Create(OpCodes.Ldarg_0));
-                // delegate target: this
-                il.InsertBefore(ret, il.Create(OpCodes.Ldarg_0));
-                // &Method
-                il.InsertBefore(ret, il.Create(OpCodes.Ldftn, targetMethod));
-                // new Action<TMsg>(this, &Method)
+                il.InsertBefore(ret, il.Create(OpCodes.Ldarg_0));           // this
+                il.InsertBefore(ret, il.Create(OpCodes.Ldarg_0));           // this for delegate target
+                il.InsertBefore(ret, il.Create(OpCodes.Ldftn, targetMethod)); // &method
                 il.InsertBefore(ret, il.Create(OpCodes.Newobj, actionCtorRef));
-                // this.RegisterNotify<TMsg>(...)
                 il.InsertBefore(ret, il.Create(OpCodes.Call, registerNotifyGeneric));
             }
 
-            Debug.Log($"[NotifyHandlerWeaver] NotifyHandler 注入完成：{declaringType.FullName}.{targetMethod.Name}");
+            Debug.Log($"[NotifyHandlerWeaver] 注入成功：{declaringType.FullName}.{targetMethod.Name}");
         }
     }
 }

@@ -13,7 +13,7 @@ namespace XPlan.Editors.Weaver
             set => EditorPrefs.SetBool(Key, value);
         }
 
-        [MenuItem("XPlanTools/Weaver/Toggle Enabled", false, 9)]
+        [MenuItem("XPlanTools/Weaver/Auto Weave Enabled", false, 9)]
         private static void Toggle()
         {
             Enabled = !Enabled;
