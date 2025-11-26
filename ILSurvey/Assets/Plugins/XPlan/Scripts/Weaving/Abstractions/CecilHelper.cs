@@ -156,5 +156,94 @@ namespace XPlan.Weaver.Abstractions
 
             return reference;
         }
+
+        public static FieldDefinition FindFieldInHierarchy(TypeDefinition type, string fieldName, int maxDepth = 16)
+        {
+            var cur = type;
+
+            for (int i = 0; i < maxDepth && cur != null; i++)
+            {
+                var field = cur.Fields.FirstOrDefault(f => f.Name == fieldName);
+                if (field != null)
+                    return field;
+
+                var baseRef = cur.BaseType;
+                if (baseRef == null)
+                    break;
+
+                try
+                {
+                    cur = baseRef.Resolve();
+                }
+                catch
+                {
+                    break;  // 解析不到就停
+                }
+            }
+
+            return null;
+        }
+
+        public static MethodDefinition FindMethodInHierarchy(TypeDefinition type, string methodName, int maxDepth = 16)
+        {
+            var cur = type;
+
+            for (int i = 0; i < maxDepth && cur != null; i++)
+            {
+                var method = cur.Methods.FirstOrDefault(m => m.Name == methodName);
+                if (method != null)
+                    return method;
+
+                var baseRef = cur.BaseType;
+                if (baseRef == null)
+                    break;
+
+                try
+                {
+                    cur = baseRef.Resolve();
+                }
+                catch
+                {
+                    break;  // 解析不到就停
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 判斷是否為 XPlan.UI.ViewBase`1 泛型定義。
+        /// </summary>
+        public static bool TryFindViewBaseGeneric(TypeDefinition type, out TypeDefinition viewBaseType, string genericName, int maxDepth = 16)
+        {
+            viewBaseType    = null;
+            var cur         = type;
+
+            // 防止循環 也防止 Unity 特殊父類型亂跳
+            for (int i = 0; i < maxDepth && cur != null; i++)
+            {
+                // 找到 XPlan.UI.ViewBase`1
+                if (cur.FullName == genericName)
+                {
+                    viewBaseType = cur;
+                    return true;
+                }
+
+                // 沒有父類別就離開
+                if (cur.BaseType == null)
+                    break;
+
+                try
+                {
+                    cur = cur.BaseType.Resolve();
+                }
+                catch
+                {
+                    break;
+                }
+            }
+
+            return false;
+        }
     }
 }

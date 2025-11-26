@@ -13,10 +13,10 @@ namespace WeaveTarget
             RegisterLogic(new NotifyHandlerLogic());
         }
 
-        [ContextMenu("SendMsg XDDDDDDD")]
+        [ContextMenu("Dispatch Notify")]
         private void SendMsg()
         {
-            DemoMessage msg = new DemoMessage("XDDDDDDD");
+            DemoMessage msg = new DemoMessage("Receiving Notify");
             msg.Send();
         }
     }

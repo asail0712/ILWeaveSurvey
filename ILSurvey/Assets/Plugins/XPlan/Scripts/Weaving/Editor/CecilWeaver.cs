@@ -54,6 +54,30 @@ namespace XPlan.Editors.Weaver
             CompilationPipeline.assemblyCompilationFinished += OnAssemblyCompiled;
         }
 
+        public static void RunNow()
+        {
+            // Unity 編譯後 DLL 真正所在的位置
+            string asmFolder = Path.Combine(
+                Application.dataPath.Replace("/Assets", ""),
+                "Library/ScriptAssemblies"
+            );
+
+            foreach (var asmName in TargetAssemblyNames)
+            {
+                string fullPath = Path.Combine(asmFolder, asmName);
+
+                if (!File.Exists(fullPath))
+                {
+                    Debug.LogWarning($"[CecilWeaver] 找不到組件：{fullPath}");
+                    continue;
+                }
+
+                Debug.Log($"[CecilWeaver] 手動 Weave：{fullPath}");
+
+                DoWeave(fullPath);
+            }
+        }
+
         private static void OnAssemblyCompiled(string assemblyPath, CompilerMessage[] msgs)
         {
             if (!CecilWeaverSettings.Enabled)

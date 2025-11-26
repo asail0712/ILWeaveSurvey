@@ -100,65 +100,64 @@ namespace XPlan.UI
         /*******************************************
          * 依照Components名稱去綁定ViewModel的函數
          * *****************************************/
+        //protected void TryBindButton(Button btn, string methodName)
+        //{
+        //    if (btn == null) return;
 
-        protected void TryBindButton(Button btn, string methodName)
-        {
-            if (btn == null) return;
+        //    if (TryResolveMethod(methodName, Type.EmptyTypes, out var target, out var mi))
+        //    {
+        //        btn.onClick.AddListener(() => mi.Invoke(target, null));
+        //    }
+        //    else
+        //    {
+        //        Debug.LogWarning($"[{name}] 找不到方法 {methodName}() 於 View 或 ViewModel。");
+        //    }
+        //}
 
-            if (TryResolveMethod(methodName, Type.EmptyTypes, out var target, out var mi))
-            {
-                btn.onClick.AddListener(() => mi.Invoke(target, null));
-            }
-            else
-            {
-                Debug.LogWarning($"[{name}] 找不到方法 {methodName}() 於 View 或 ViewModel。");
-            }
-        }
+        //protected void TryBindToggle(Toggle toggle, string methodName)
+        //{
+        //    if (toggle == null) return;
 
-        protected void TryBindToggle(Toggle toggle, string methodName)
-        {
-            if (toggle == null) return;
+        //    // 期望簽名：void OnXxxChange(bool)
+        //    if (TryResolveMethod(methodName, new[] { typeof(bool) }, out var target, out var mi))
+        //    {
+        //        toggle.onValueChanged.AddListener(v => mi.Invoke(target, new object[] { v }));
+        //    }
+        //    else
+        //    {
+        //        Debug.LogWarning($"[{name}] 找不到方法 {methodName}(bool) 於 View 或 ViewModel。");
+        //    }
+        //}
 
-            // 期望簽名：void OnXxxChange(bool)
-            if (TryResolveMethod(methodName, new[] { typeof(bool) }, out var target, out var mi))
-            {
-                toggle.onValueChanged.AddListener(v => mi.Invoke(target, new object[] { v }));
-            }
-            else
-            {
-                Debug.LogWarning($"[{name}] 找不到方法 {methodName}(bool) 於 View 或 ViewModel。");
-            }
-        }
+        //protected void TryBindInputField(InputField tf, string methodName)
+        //{
+        //    if (tf == null) return;
 
-        protected void TryBindInputField(InputField tf, string methodName)
-        {
-            if (tf == null) return;
+        //    // 期望簽名：void OnXxxChange(string)
+        //    if (TryResolveMethod(methodName, new[] { typeof(string) }, out var target, out var mi))
+        //    {
+        //        tf.onValueChanged.AddListener(s => mi.Invoke(target, new object[] { s }));
+        //    }
+        //    else
+        //    {
+        //        Debug.LogWarning($"[{name}] 找不到方法 {methodName}(string) 於 View 或 ViewModel。");
+        //    }
+        //}
 
-            // 期望簽名：void OnXxxChange(string)
-            if (TryResolveMethod(methodName, new[] { typeof(string) }, out var target, out var mi))
-            {
-                tf.onValueChanged.AddListener(s => mi.Invoke(target, new object[] { s }));
-            }
-            else
-            {
-                Debug.LogWarning($"[{name}] 找不到方法 {methodName}(string) 於 View 或 ViewModel。");
-            }
-        }
+        //protected void TryBindSlider(Slider slider, string methodName)
+        //{
+        //    if (slider == null) return;
 
-        protected void TryBindSlider(Slider slider, string methodName)
-        {
-            if (slider == null) return;
-
-            // 期望簽名：void OnXxxChange(float)
-            if (TryResolveMethod(methodName, new[] { typeof(float) }, out var target, out var mi))
-            {
-                slider.onValueChanged.AddListener(f => mi.Invoke(target, new object[] { f }));
-            }
-            else
-            {
-                Debug.LogWarning($"[{name}] 找不到方法 {methodName}(float) 於 View 或 ViewModel。");
-            }
-        }
+        //    // 期望簽名：void OnXxxChange(float)
+        //    if (TryResolveMethod(methodName, new[] { typeof(float) }, out var target, out var mi))
+        //    {
+        //        slider.onValueChanged.AddListener(f => mi.Invoke(target, new object[] { f }));
+        //    }
+        //    else
+        //    {
+        //        Debug.LogWarning($"[{name}] 找不到方法 {methodName}(float) 於 View 或 ViewModel。");
+        //    }
+        //}
 
         private void IndexVmObservables()
         {
@@ -206,7 +205,7 @@ namespace XPlan.UI
         /// <summary>
         /// 透過反射自動掃描並註冊所有 Button 欄位。
         /// </summary>
-        private void AutoRegisterComponents()
+        protected virtual void AutoRegisterComponents()
         {
             var fields = GetType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -263,20 +262,20 @@ namespace XPlan.UI
                         });
                     }
                 }
-                else if (obj is Button)
-                {
-                    Button btn = (Button)obj;
+                //else if (obj is Button)
+                //{
+                //    Button btn = (Button)obj;
 
-                    if (btn != null)
-                    {
-                        string method = $"On{baseName}Click";
-                        TryBindButton(btn, method);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"[AutoRegisterComponents] 欄位 {field.Name} 為 null，請確認是否有綁定。");
-                    }
-                }                
+                //    if (btn != null)
+                //    {
+                //        string method = $"On{baseName}Click";
+                //        TryBindButton(btn, method);
+                //    }
+                //    else
+                //    {
+                //        Debug.LogWarning($"[AutoRegisterComponents] 欄位 {field.Name} 為 null，請確認是否有綁定。");
+                //    }
+                //}                
             }
         }
 

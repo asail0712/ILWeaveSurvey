@@ -19,5 +19,19 @@ namespace XPlan.Editors.Weaver
             Enabled = !Enabled;
             Debug.Log($"[CecilWeaver] Enabled = {Enabled}");
         }
+
+        // ★ 新增：手動觸發 Weave
+        [MenuItem("XPlanTools/Weaver/Run Weaver Now")]
+        private static void RunWeaverNow()
+        {
+            // 直接呼叫公開 AP
+            CecilWeaver.RunNow();
+
+            Debug.Log("[CecilWeaver] 手動觸發 IL Weaving…");
+
+            // 重新觸發編譯 → 重新 run weaving
+            //AssetDatabase.SaveAssets();
+            //UnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();
+        }
     }
 }
