@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
-using XPlan.UI.Fade;
 
 namespace XPlan.UI
 {    
@@ -18,13 +15,14 @@ namespace XPlan.UI
         public MethodInfo ForceNotify;
     }
 
+    [ViewBinding]
     public class ViewBase<TViewModel> : MonoBehaviour, IUIView where TViewModel : ViewModelBase
     {
         private TViewModel _viewModel;                                                                          // viewmodel本體
         private readonly List<IDisposable> _disposables                         = new();                        // 解除訂閱集中管理
         private readonly Dictionary<string, ObservableBinding> _vmObservableMap = new(StringComparer.Ordinal);  // 新增：把 VM 內的 ObservableProperty 索引起來（baseName → 綁定資訊）
         private readonly SpriteCache _spriteCache                               = new();                        // 給圖片綁定用的 Sprite 快取
-        private const int TimeToWaitViewModel                                   = 5000;        
+        private const int TimeToWaitViewModel                                   = 10;        
         
         private void Awake()
         {
@@ -43,8 +41,17 @@ namespace XPlan.UI
 
                 // ★ 新增：VM→UI（Visible）
                 ViewBindingHelper.AutoBindVisibility(this, _vmObservableMap, _disposables);   
+
+                // 衍生類別為內部特定元件時 給予 ViewModel資訊
+                if(this is IViewModelGetter<TViewModel>)
+                {
+                    IViewModelGetter<TViewModel> view = this as IViewModelGetter<TViewModel>;
+
+                    view.OnViewModelReady(_viewModel);
+                }
             });
         }
+
 
         private void OnDestroy()
         {
